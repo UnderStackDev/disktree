@@ -13,6 +13,7 @@
 
 mod app_menu;
 mod appearance;
+mod decorations;
 mod git;
 mod marks;
 mod palette;
@@ -169,6 +170,14 @@ fn run() -> Result<()> {
                         // Left unset, the class is empty and that rule never
                         // matches.
                         app_id: Some("disktree".to_owned()),
+                        // GNOME on Wayland has no server-side decorations:
+                        // there the window draws its own frame, title bar
+                        // and buttons. A compositor that decorates windows
+                        // itself may still answer server-side, and then
+                        // nothing extra is drawn. See `decorations`.
+                        window_decorations: Some(
+                            gpui_kit::WindowDecorations::Client,
+                        ),
                         // Below this the treemap stops being readable, so ask
                         // the compositor not to go there.
                         window_min_size: Some(size(px(900.), px(600.))),

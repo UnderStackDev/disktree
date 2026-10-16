@@ -26,7 +26,7 @@ TARGET = target/release/disktree
 ICON = assets/disktree.svg
 DESKTOP = packaging/disktree.desktop.in
 
-.PHONY: help build run install uninstall bundle lint test ci fmt clean
+.PHONY: help build run install uninstall bundle packages lint test ci fmt clean
 
 help:
 	@echo "disktree"
@@ -37,6 +37,7 @@ help:
 	@echo "                   (macOS: disktree.app into $(APPS))"
 	@echo "  make bundle      macOS: build target/bundle/disktree.app and its zip"
 	@echo "  make uninstall   remove what install put there"
+	@echo "  make packages    .deb and .rpm into target/packages"
 	@echo "  make lint        rustfmt --check and clippy -D warnings"
 	@echo "  make test        core and window-harness tests"
 	@echo "  make ci          lint, then test"
@@ -116,6 +117,22 @@ endif
 
 bundle:
 	$(CARGO) xtask bundle
+
+# .deb and .rpm for /usr, into target/packages. Needs cargo-deb and
+# cargo-generate-rpm (`cargo binstall cargo-deb cargo-generate-rpm`).
+# PKG_RELEASE is the package's own revision on top of the crate version.
+PKG_RELEASE ?= 1
+packages: build
+	install -d target/packaging target/packages
+	strip -o target/packaging/disktree $(TARGET)
+	VERSION=$$(sed -n 's/^version = "\(.*\)"/\1/p' $(MANIFEST) | head -1) && \
+	sed -e 's|@BINDIR@|/usr/bin|' -e "s|@VERSION@|$$VERSION|" \
+	    $(DESKTOP) > target/packaging/disktree.desktop
+	$(CARGO) deb -p disktree-app --no-build \
+	    --deb-revision $(PKG_RELEASE) -o target/packages/
+	$(CARGO) generate-rpm -p crates/disktree-app \
+	    -s 'release = "$(PKG_RELEASE)"' -o target/packages/
+	@ls -1 target/packages
 
 clean:
 	$(CARGO) clean

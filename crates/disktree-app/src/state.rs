@@ -379,7 +379,10 @@ pub struct Disktree {
     /// has no window, and opening or closing the dialog must move focus.
     pub focus_request: Option<FocusTarget>,
     /// What the titlebar says, so it is only set when it changes.
-    window_title: String,
+    pub window_title: String,
+    /// Where a press on our own title bar landed, until it becomes a window
+    /// move or is let go. See `decorations::title_bar`.
+    pub title_drag: Option<gpui_kit::Point<gpui_kit::Pixels>>,
     /// The window's `rem` in pixels, read each frame. The mosaic is laid out
     /// in pixels, so its header band and label thresholds are scaled by this
     /// to follow interface zoom like the rest of the interface.
@@ -511,6 +514,7 @@ impl Disktree {
             confirm_focus: cx.focus_handle(),
             focus_request: None,
             window_title: String::new(),
+            title_drag: None,
             rem: crate::ui::BASE_REM,
             run: None,
             run_epoch: 0,
@@ -3202,7 +3206,9 @@ impl Render for Disktree {
             window.set_window_title(&title);
             self.window_title = title;
         }
-        crate::views::root(self, window, cx)
+        let theme = gpui_omarchy::ActiveTheme::omarchy(&**cx).clone();
+        let root = crate::views::root(self, window, cx);
+        crate::decorations::frame(root, &theme, window)
     }
 }
 

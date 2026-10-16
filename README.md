@@ -1,5 +1,15 @@
 # disktree
 
+> **Fork of [tobi/disktree](https://github.com/tobi/disktree) for GNOME.**
+> Upstream is built for Omarchy/Hyprland, where the compositor handles the
+> window. On GNOME (Wayland) a window has to draw its own frame, so this fork
+> adds client-side decorations: a title bar to drag and double-click, the
+> minimize/maximize/close buttons, a shadow and resize edges
+> (`crates/disktree-app/src/decorations.rs`). They only appear where the
+> compositor asks the app to decorate itself.
+>
+> Packages: `.deb` and `.rpm` on the releases page, or `make packages`.
+
 ![disktree: a home directory as a treemap, coloured by kind of data, with reclaimable space hatched and the selection, findings and free space in the side panel](assets/screenshot.png)
 
 Find what is filling a disk, mark what should go, and remove it — with the

@@ -13,6 +13,43 @@ path = "src/main.rs"
 [lints]
 workspace = true
 
+# Linux packages, built by `make packages` (cargo-deb, cargo-generate-rpm).
+# The Makefile stages a stripped binary and the desktop entry, rendered with
+# BINDIR=/usr/bin, in target/packaging first.
+[package.metadata.deb]
+name = "disktree"
+maintainer = "UnderStackDev <understack_dev@outlook.com>"
+copyright = "Tobi Lütke and disktree contributors"
+license-file = ["../../LICENSE", "0"]
+extended-description = """\
+A treemap of what is using your disk. Mark what should go, review the list \
+and remove it, with the volume's free space in view the whole time. This \
+build draws its own title bar, window buttons and resize edges, so it works \
+as a normal window on GNOME."""
+section = "utils"
+priority = "optional"
+depends = "$auto, libvulkan1"
+assets = [
+    ["../../target/packaging/disktree", "usr/bin/", "755"],
+    ["../../target/packaging/disktree.desktop", "usr/share/applications/", "644"],
+    ["../../assets/disktree.svg", "usr/share/icons/hicolor/scalable/apps/", "644"],
+    ["../../README.md", "usr/share/doc/disktree/README.md", "644"],
+]
+
+[package.metadata.generate-rpm]
+name = "disktree"
+summary = "Treemap of what is using your disk"
+assets = [
+    { source = "../../target/packaging/disktree", dest = "/usr/bin/disktree", mode = "755" },
+    { source = "../../target/packaging/disktree.desktop", dest = "/usr/share/applications/disktree.desktop", mode = "644" },
+    { source = "../../assets/disktree.svg", dest = "/usr/share/icons/hicolor/scalable/apps/disktree.svg", mode = "644" },
+    { source = "../../README.md", dest = "/usr/share/doc/disktree/README.md", mode = "644", doc = true },
+    { source = "../../LICENSE", dest = "/usr/share/licenses/disktree/LICENSE", mode = "644", doc = true },
+]
+
+[package.metadata.generate-rpm.requires]
+vulkan-loader = "*"
+
 [dependencies]
 gpui-kit = { version = "=0.6.6", default-features = false, features = ["assets"] }
 gpui-omarchy = "0.1.3"

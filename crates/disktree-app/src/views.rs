@@ -44,6 +44,8 @@ pub fn root(
     cx: &mut Context<'_, Disktree>,
 ) -> Stateful<Div> {
     let theme = cx.omarchy().clone();
+    let title_bar =
+        crate::decorations::title_bar(&app.window_title, &theme, window, cx);
     let body = match app.screen {
         Screen::Explore => explore(app, window, cx),
         Screen::Review => review(app, window, cx),
@@ -104,6 +106,7 @@ pub fn root(
         .text_color(theme.foreground)
         .font_family(theme.font)
         .text_size(text::BODY)
+        .children(title_bar)
         .child(body);
     if let Some(tip) = cursor_tooltip(app, window, cx) {
         root = root.child(tip);
