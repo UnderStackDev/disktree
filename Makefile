@@ -26,7 +26,7 @@ TARGET = target/release/disktree
 ICON = assets/disktree.svg
 DESKTOP = packaging/disktree.desktop.in
 
-.PHONY: help build run install uninstall bundle packages lint test ci fmt clean
+.PHONY: help build run install uninstall bundle packages release lint test ci fmt clean
 
 help:
 	@echo "disktree"
@@ -38,6 +38,7 @@ help:
 	@echo "  make bundle      macOS: build target/bundle/disktree.app and its zip"
 	@echo "  make uninstall   remove what install put there"
 	@echo "  make packages    .deb and .rpm into target/packages"
+	@echo "  make release     lint, test, packages, tag and GitHub release (local)"
 	@echo "  make lint        rustfmt --check and clippy -D warnings"
 	@echo "  make test        core and window-harness tests"
 	@echo "  make ci          lint, then test"
@@ -133,6 +134,28 @@ packages: build
 	$(CARGO) generate-rpm -p crates/disktree-app \
 	    -s 'release = "$(PKG_RELEASE)"' -o target/packages/
 	@ls -1 target/packages
+
+# Releases are built here, not in CI: lint and test, build the packages,
+# tag v<version>-gnome.<PKG_RELEASE> and publish them as a GitHub release
+# of this fork. Needs a clean tree that is pushed to origin.
+release: ci
+	@test -z "$$(git status --porcelain)" || \
+	    { echo "release: uncommitted changes"; exit 1; }
+	@git fetch -q origin && \
+	test "$$(git rev-parse HEAD)" = "$$(git rev-parse @{u})" || \
+	    { echo "release: HEAD is not pushed to $$(git rev-parse --abbrev-ref @{u})"; exit 1; }
+	$(MAKE) packages
+	VERSION=$$(sed -n 's/^version = "\(.*\)"/\1/p' $(MANIFEST) | head -1) && \
+	TAG=v$$VERSION-gnome.$(PKG_RELEASE) && \
+	git tag -a $$TAG -m "disktree $$VERSION with GNOME window decorations" && \
+	git push -q origin $$TAG && \
+	gh release create $$TAG \
+	    -R "$$(git remote get-url origin | sed -E 's#.*github.com[:/]##; s#\.git$$##')" \
+	    --title "disktree $$VERSION (GNOME, package release $(PKG_RELEASE))" \
+	    --notes "disktree $$VERSION from upstream tobi/disktree, with client-side window decorations for GNOME. Install with \`sudo apt install ./disktree_*.deb\` or \`sudo dnf install ./disktree-*.rpm\`. Built on $$(. /etc/os-release && echo $$PRETTY_NAME), glibc $$(ldd --version | sed -n '1s/.* //p')." \
+	    --generate-notes \
+	    target/packages/disktree_$${VERSION}-$(PKG_RELEASE)_amd64.deb \
+	    target/packages/disktree-$${VERSION}-$(PKG_RELEASE).x86_64.rpm
 
 clean:
 	$(CARGO) clean
