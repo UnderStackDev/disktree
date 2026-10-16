@@ -131,7 +131,7 @@ fn run() -> Result<()> {
     let title_root = root.clone();
 
     gpui_kit::application()
-        .with_assets(gpui_kit::assets::Assets)
+        .with_assets(decorations::Assets)
         .run(move |cx| {
             gpui_omarchy::init(cx);
             app_menu::install(cx);

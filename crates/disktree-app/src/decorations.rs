@@ -9,17 +9,59 @@
 //! says decorations are the client's job, so nothing changes where the
 //! compositor already does it.
 
+use std::borrow::Cow;
+
 use gpui_kit::prelude::FluentBuilder as _;
 use gpui_kit::{
-    AnyElement, BoxShadow, Context, CursorStyle, Decorations, Div, Edges, Hsla,
-    InteractiveElement as _, IntoElement, MouseButton, MouseDownEvent,
-    MouseMoveEvent, ParentElement, Pixels, Point, ResizeEdge, Size,
-    StatefulInteractiveElement as _, Styled, Tiling, Window, div, point, px,
+    AnyElement, AssetSource, BoxShadow, Context, CursorStyle, Decorations, Div,
+    Edges, FontWeight, Hsla, InteractiveElement as _, IntoElement, MouseButton,
+    MouseDownEvent, MouseMoveEvent, ParentElement, Pixels, Point, ResizeEdge,
+    SharedString, Size, StatefulInteractiveElement as _, Styled, Tiling,
+    Window, div, point, px, svg,
 };
-use gpui_omarchy::{IconName, Theme, icon};
+use gpui_omarchy::Theme;
 
 use crate::state::Disktree;
-use crate::ui::{space, text};
+use crate::ui::{icon, size, space, text};
+
+/// The window buttons' glyphs, drawn to GNOME's symbolic shapes on its 16px
+/// grid. The bundled set has Windows' thin-line glyphs, which look foreign
+/// next to every GTK window on the same desktop.
+const GLYPHS: [(&str, &[u8]); 4] = [
+    (MINIMIZE, include_bytes!("../assets/window/minimize.svg")),
+    (MAXIMIZE, include_bytes!("../assets/window/maximize.svg")),
+    (RESTORE, include_bytes!("../assets/window/restore.svg")),
+    (CLOSE, include_bytes!("../assets/window/close.svg")),
+];
+const MINIMIZE: &str = "disktree/window/minimize.svg";
+const MAXIMIZE: &str = "disktree/window/maximize.svg";
+const RESTORE: &str = "disktree/window/restore.svg";
+const CLOSE: &str = "disktree/window/close.svg";
+
+/// The default asset bundle plus the window buttons' glyphs.
+pub struct Assets;
+
+impl AssetSource for Assets {
+    fn load(&self, path: &str) -> anyhow::Result<Option<Cow<'static, [u8]>>> {
+        if let Some((_, bytes)) = GLYPHS.iter().find(|(name, _)| *name == path)
+        {
+            return Ok(Some(Cow::Borrowed(bytes)));
+        }
+        gpui_kit::assets::Assets.load(path)
+    }
+
+    fn list(&self, path: &str) -> anyhow::Result<Vec<SharedString>> {
+        let mut found = gpui_kit::assets::Assets.list(path)?;
+        found.extend(
+            GLYPHS
+                .iter()
+                .map(|(name, _)| *name)
+                .filter(|name| name.starts_with(path))
+                .map(SharedString::from),
+        );
+        Ok(found)
+    }
+}
 
 /// Room around the frame for its shadow. Also where the resize edges are
 /// caught, so it is reserved even on a side that draws no shadow.
@@ -114,14 +156,14 @@ pub fn title_bar(
     }
     let bar = div()
         .id("title-bar")
+        .relative()
         .flex()
         .flex_row()
         .flex_shrink_0()
         .items_center()
-        .gap(space::SM)
-        .pl(space::LG)
-        .pr(space::SM)
-        .py(space::XS)
+        .justify_end()
+        .h(size::TITLE_BAR)
+        .px(space::SM)
         .bg(theme.surface)
         .border_b_1()
         .border_color(theme.divider())
@@ -162,20 +204,32 @@ pub fn title_bar(
         .on_mouse_down(MouseButton::Right, |event, window, _| {
             window.show_window_menu(event.position);
         })
+        // GNOME centres the title on the whole bar, not on what the buttons
+        // leave of it, so it spans the bar and the buttons paint over it.
+        // The side margins keep a long title clear of them.
         .child(
             div()
-                .flex_1()
-                .min_w_0()
-                .overflow_hidden()
-                .text_ellipsis()
-                .whitespace_nowrap()
-                .text_size(text::BODY)
-                .text_color(if window.is_window_active() {
-                    theme.foreground
-                } else {
-                    theme.secondary
-                })
-                .child(title.to_owned()),
+                .absolute()
+                .inset_0()
+                .flex()
+                .items_center()
+                .justify_center()
+                .px(size::TITLE_BAR_CONTROLS)
+                .child(
+                    div()
+                        .min_w_0()
+                        .overflow_hidden()
+                        .text_ellipsis()
+                        .whitespace_nowrap()
+                        .text_size(text::TITLE)
+                        .font_weight(FontWeight::BOLD)
+                        .text_color(if window.is_window_active() {
+                            theme.foreground
+                        } else {
+                            theme.secondary
+                        })
+                        .child(title.to_owned()),
+                ),
         )
         .child(controls(theme, window));
     Some(bar.into_any_element())
@@ -185,30 +239,28 @@ pub fn title_bar(
 /// it can honour, and close always.
 fn controls(theme: &Theme, window: &Window) -> Div {
     let supported = window.window_controls();
-    let zoom_icon = if window.is_maximized() {
-        IconName::WindowRestore
+    let zoom_glyph = if window.is_maximized() {
+        RESTORE
     } else {
-        IconName::WindowMaximize
+        MAXIMIZE
     };
     div()
+        .relative()
         .flex()
         .flex_row()
         .items_center()
         .gap(space::SM)
         .when(supported.minimize, |row| {
-            row.child(control(
-                "window-minimize",
-                IconName::WindowMinimize,
-                theme,
-                |window| window.minimize_window(),
-            ))
+            row.child(control("window-minimize", MINIMIZE, theme, |window| {
+                window.minimize_window();
+            }))
         })
         .when(supported.maximize, |row| {
-            row.child(control("window-zoom", zoom_icon, theme, |window| {
+            row.child(control("window-zoom", zoom_glyph, theme, |window| {
                 window.zoom_window();
             }))
         })
-        .child(control("window-close", IconName::WindowClose, theme, |w| {
+        .child(control("window-close", CLOSE, theme, |w| {
             w.remove_window();
         }))
 }
@@ -216,7 +268,7 @@ fn controls(theme: &Theme, window: &Window) -> Div {
 /// One round window button, as GNOME draws them.
 fn control(
     id: &'static str,
-    name: IconName,
+    glyph: &'static str,
     theme: &Theme,
     act: impl Fn(&mut Window) + 'static,
 ) -> impl IntoElement {
@@ -245,7 +297,12 @@ fn control(
             cx.stop_propagation();
             act(window);
         })
-        .child(icon(name).size(crate::ui::icon::SM))
+        .child(
+            svg()
+                .path(glyph)
+                .size(icon::WINDOW)
+                .text_color(theme.foreground),
+        )
 }
 
 /// GNOME's ambient shadow, fainter while another window has the focus. The
@@ -407,6 +464,17 @@ fn resize_zones(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn the_window_glyphs_load_beside_the_default_bundle() {
+        for glyph in [MINIMIZE, MAXIMIZE, RESTORE, CLOSE] {
+            let bytes = Assets.load(glyph).unwrap().unwrap();
+            assert!(bytes.starts_with(b"<svg"), "{glyph}");
+        }
+        // The rest of the app still draws its icons from the bundle.
+        let check = gpui_kit::assets::IconName::Check.path();
+        assert!(Assets.load(&check).unwrap().is_some());
+    }
 
     fn floating() -> Tiling {
         Tiling::default()

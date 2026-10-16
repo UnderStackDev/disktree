@@ -62,6 +62,8 @@ pub mod icon {
     pub const SM: Rems = Rems(0.75);
     pub const MD: Rems = Rems(0.875);
     pub const LG: Rems = Rems(1.375);
+    /// A window button's glyph: GNOME's symbolic icons are drawn for 16px.
+    pub const WINDOW: Rems = Rems(1.0);
 }
 
 /// Region and lane widths. Each is the comfortable default for its content at
@@ -69,6 +71,11 @@ pub mod icon {
 pub mod size {
     use super::Rems;
 
+    /// The drawn title bar, as tall as a GNOME header bar (46px).
+    pub const TITLE_BAR: Rems = Rems(2.875);
+    /// Room kept clear on each side of the centred title for the three
+    /// window buttons (24px each, 8px apart) and the bar's padding.
+    pub const TITLE_BAR_CONTROLS: Rems = Rems(6.5);
     /// A crumb's sibling menu.
     pub const SIBLING_MENU: Rems = Rems(24.0);
     pub const SIBLING_MENU_HEIGHT: Rems = Rems(32.0);
